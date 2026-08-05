@@ -39,19 +39,34 @@ const mongoose = require('mongoose');
 
 async function resolveAssigneeId(assignedTo, defaultUserId) {
   if (!assignedTo) return defaultUserId;
-  if (mongoose.Types.ObjectId.isValid(assignedTo)) return assignedTo;
+
+  if (mongoose.Types.ObjectId.isValid(assignedTo)) {
+    const userById = await User.findById(assignedTo);
+    if (userById) return userById._id;
+  }
 
   const user = await User.findOne({
     $or: [{ name: assignedTo }, { email: assignedTo }],
   });
-  return user ? user._id : defaultUserId;
+
+  if (!user) {
+    const err = new Error('User not exist');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return user._id;
 }
 
 // @desc    Create a new task
 // @route   POST /api/tasks
-// @access  Private
+// @access  Private (Admin, Supervisor)
 exports.create = async (req, res, next) => {
   try {
+    if (req.user.role === 'user') {
+      return res.status(403).json({ message: 'Agents are not authorized to create or assign tasks.' });
+    }
+
     const { title, assignedTo, dueDate, priority, category } = req.body;
     const assigneeId = await resolveAssigneeId(assignedTo, req.user.id);
 
@@ -83,7 +98,11 @@ exports.update = async (req, res, next) => {
     }
 
     const updateFields = { ...req.body };
-    if (updateFields.assignedTo) {
+    if (req.user.role === 'user') {
+      // Agents can only update task completion status, not reassignment
+      delete updateFields.assignedTo;
+      delete updateFields.createdBy;
+    } else if (updateFields.assignedTo) {
       updateFields.assignedTo = await resolveAssigneeId(updateFields.assignedTo, task.assignedTo);
     }
 
@@ -100,9 +119,13 @@ exports.update = async (req, res, next) => {
 
 // @desc    Delete a task
 // @route   DELETE /api/tasks/:id
-// @access  Private
+// @access  Private (Admin, Supervisor)
 exports.remove = async (req, res, next) => {
   try {
+    if (req.user.role === 'user') {
+      return res.status(403).json({ message: 'Agents are not authorized to delete tasks.' });
+    }
+
     const task = await Task.findById(req.params.id);
     if (!task) {
       return res.status(404).json({ message: 'Task not found.' });

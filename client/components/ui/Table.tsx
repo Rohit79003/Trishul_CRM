@@ -25,7 +25,7 @@ export function Table<T>({
   keyExtractor,
 }: TableProps<T>) {
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-sm">
+    <div className="w-full overflow-x-auto rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/80 shadow-sm transition-all">
       <table className="w-full text-left text-sm border-collapse">
         <thead>
           <tr className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400 font-medium">
@@ -43,11 +43,11 @@ export function Table<T>({
         </thead>
         <tbody className="divide-y divide-slate-200/80 dark:divide-slate-800/80 text-slate-700 dark:text-slate-200">
           {isLoading ? (
-            Array.from({ length: 4 }).map((_, rIdx) => (
-              <tr key={rIdx} className="animate-pulse">
+            Array.from({ length: 5 }).map((_, rIdx) => (
+              <tr key={rIdx} className="animate-pulse bg-slate-50/40 dark:bg-slate-900/40">
                 {columns.map((_, cIdx) => (
                   <td key={cIdx} className="px-4 py-4">
-                    <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded w-3/4" />
+                    <div className="h-4 bg-slate-200 dark:bg-slate-800 rounded-md w-3/4 animate-pulse" />
                   </td>
                 ))}
               </tr>
@@ -56,7 +56,7 @@ export function Table<T>({
             <tr>
               <td
                 colSpan={columns.length}
-                className="px-4 py-8 text-center text-slate-500 dark:text-slate-400"
+                className="px-4 py-12 text-center text-slate-500 dark:text-slate-400"
               >
                 {emptyMessage}
               </td>

@@ -6,6 +6,7 @@ import api from "@/lib/api";
 import { useTheme } from "@/context/ThemeContext";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
+import DataState from "@/components/ui/DataState";
 import {
   Settings,
   Building,
@@ -17,7 +18,11 @@ import {
   AlertCircle,
 } from "lucide-react";
 
+import useAuth from "@/hooks/useAuth";
+import { ShieldAlert } from "lucide-react";
+
 export default function SettingsPage() {
+  const { user: currentUser, isLoading: isAuthLoading } = useAuth();
   const { theme, toggleTheme } = useTheme();
 
   const [companyName, setCompanyName] = useState("Trishul Global Enterprise");
@@ -30,6 +35,41 @@ export default function SettingsPage() {
   const [pwdMsg, setPwdMsg] = useState("");
   const [pwdError, setPwdError] = useState("");
 
+  const { data: initialSettings, loading, error, refetch } = useFetch<any>("/settings");
+
+  React.useEffect(() => {
+    if (initialSettings?.companyName) {
+      setCompanyName(initialSettings.companyName);
+    }
+    if (initialSettings?.logoUrl) {
+      setLogoPreview(initialSettings.logoUrl);
+    }
+  }, [initialSettings]);
+
+  if (isAuthLoading) {
+    return (
+      <DataState loading={true} loadingMessage="Verifying permissions...">
+        <div className="h-48" />
+      </DataState>
+    );
+  }
+
+  if (!currentUser || currentUser.role !== "admin") {
+    return (
+      <Card className="p-8 text-center max-w-lg mx-auto my-12 space-y-4">
+        <div className="p-4 rounded-full bg-rose-500/10 text-rose-500 w-16 h-16 mx-auto flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          Settings Boundary Restricted
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          The Settings module is restricted strictly to users with the <strong className="text-brand-amber">Admin</strong> role. Your current role is <strong className="capitalize text-slate-300">{currentUser?.role || "agent"}</strong>.
+        </p>
+      </Card>
+    );
+  }
+
   const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -40,17 +80,6 @@ export default function SettingsPage() {
       reader.readAsDataURL(file);
     }
   };
-
-  const { data: initialSettings } = useFetch<any>("/settings");
-
-  React.useEffect(() => {
-    if (initialSettings?.companyName) {
-      setCompanyName(initialSettings.companyName);
-    }
-    if (initialSettings?.logoUrl) {
-      setLogoPreview(initialSettings.logoUrl);
-    }
-  }, [initialSettings]);
 
   const handleSaveProfile = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,25 +133,25 @@ export default function SettingsPage() {
       </div>
 
       {/* Company Branding & Logo Card */}
-      <Card animateHover={false} className="p-6 space-y-4">
-        <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
-          <Building className="w-5 h-5 text-brand-amber" /> Company Branding Profile
-        </h3>
+      <DataState loading={loading} error={error} onRetry={refetch}>
+        <Card animateHover={false} className="p-6 space-y-4">
+          <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2 border-b border-slate-100 dark:border-slate-800 pb-3">
+            <Building className="w-5 h-5 text-brand-amber" /> Company Branding Profile
+          </h3>
 
-        {savedMsg && (
-          <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4" /> {savedMsg}
-          </div>
-        )}
+          {savedMsg && (
+            <div className="p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 text-xs flex items-center gap-2">
+              <CheckCircle2 className="w-4 h-4" /> {savedMsg}
+            </div>
+          )}
 
-        {savedError && (
-          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4" /> {savedError}
-          </div>
-        )}
+          {savedError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <AlertCircle className="w-4 h-4" /> {savedError}
+            </div>
+          )}
 
-        <form onSubmit={handleSaveProfile} className="space-y-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Company Name
@@ -159,15 +188,15 @@ export default function SettingsPage() {
                 )}
               </div>
             </div>
-          </div>
 
-          <div className="flex justify-end">
-            <Button type="submit" variant="primary" size="sm">
-              Save Branding Settings
-            </Button>
-          </div>
-        </form>
-      </Card>
+            <div className="flex justify-end">
+              <Button type="submit" variant="primary" size="sm">
+                Save Branding Settings
+              </Button>
+            </div>
+          </form>
+        </Card>
+      </DataState>
 
       {/* Theme Preference Card */}
       <Card animateHover={false} className="p-6 space-y-4">

@@ -13,7 +13,8 @@ const CustomerSchema = new mongoose.Schema({
   },
   phone: {
     type: String,
-    required: true,
+    required: [true, "Phone number is required"],
+    match: [/^\d{10}$/, "Phone number must be exactly 10 digits"],
   },
   email: {
     type: String,
@@ -38,6 +39,10 @@ const CustomerSchema = new mongoose.Schema({
     default: '',
   },
   createdBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
+  assignedTo: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   },

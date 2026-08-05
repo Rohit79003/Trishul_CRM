@@ -21,11 +21,12 @@ import {
   TrendingUp,
   Briefcase,
 } from "lucide-react";
+import DataState from "@/components/ui/DataState";
 import Link from "next/link";
 
 export default function DashboardPage() {
   const { user } = useAuth();
-  const { data, loading, error } = useFetch<any>("/dashboard/summary");
+  const { data, loading, error, refetch } = useFetch<any>("/dashboard/summary");
 
   const metrics = data?.metrics || {
     totalCustomers: 0,
@@ -69,14 +70,9 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {error && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium">
-          Failed to load dashboard metrics from backend API. Please make sure backend server is running.
-        </div>
-      )}
-
-      {/* 5 CountUp Stat Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+      <DataState loading={loading} error={error} onRetry={refetch} skeletonType="stat-grid">
+        {/* 5 CountUp Stat Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* Card 1: Total Customers */}
         <Card>
           <div className="flex items-center justify-between">
@@ -166,10 +162,10 @@ export default function DashboardPage() {
             <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white">
               <CountUp end={metrics.pendingTasks} duration={1.2} />
             </div>
-            <span className="text-xs font-medium text-amber-500">Active</span>
           </div>
         </Card>
       </div>
+      </DataState>
 
       {/* Analytics Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

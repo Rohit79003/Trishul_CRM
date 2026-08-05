@@ -4,9 +4,13 @@ const bcrypt = require('bcryptjs');
 
 // @desc    Get company settings
 // @route   GET /api/settings
-// @access  Private
+// @access  Private (Admin Only)
 exports.getSettings = async (req, res, next) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only Administrators are authorized to view or configure company settings.' });
+    }
+
     let settings = await Setting.findOne();
     if (!settings) {
       settings = await Setting.create({
@@ -23,9 +27,13 @@ exports.getSettings = async (req, res, next) => {
 
 // @desc    Update company settings
 // @route   PUT /api/settings
-// @access  Private
+// @access  Private (Admin Only)
 exports.updateSettings = async (req, res, next) => {
   try {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Only Administrators are authorized to view or configure company settings.' });
+    }
+
     const { companyName, logoUrl, theme } = req.body;
 
     let settings = await Setting.findOne();

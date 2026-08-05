@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
 import { Role } from "@/types";
-import { Shield, Lock, Mail, UserCheck, ArrowRight, Sparkles, Play } from "lucide-react";
+import { Shield, Lock, Mail, ArrowRight, Sparkles, Play } from "lucide-react";
 import Button from "@/components/ui/Button";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import OpeningAnimation from "@/components/intro/OpeningAnimation";
@@ -13,7 +13,6 @@ export default function LoginPage() {
   const { login, isLoading } = useAuth();
   const [email, setEmail] = useState("admin@trishul.com");
   const [password, setPassword] = useState("password123");
-  const [selectedRole, setSelectedRole] = useState<Role>("admin");
   const [errorMsg, setErrorMsg] = useState("");
   const [showIntro, setShowIntro] = useState<boolean>(false);
   const [isCheckingIntro, setIsCheckingIntro] = useState<boolean>(true);
@@ -50,14 +49,13 @@ export default function LoginPage() {
     }
     setErrorMsg("");
     try {
-      await login(email, password, selectedRole);
+      await login(email, password);
     } catch (err: any) {
       setErrorMsg(err.message || "Login failed. Please check credentials.");
     }
   };
 
   const handleQuickRole = (role: Role) => {
-    setSelectedRole(role);
     const emails: Record<Role, string> = {
       admin: "admin@trishul.com",
       supervisor: "supervisor@trishul.com",
@@ -120,30 +118,28 @@ export default function LoginPage() {
             </p>
           </div>
 
-          {/* Quick Evaluator Role Selector Chips */}
-          <div className="mb-6 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
-            <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
-              <span className="flex items-center gap-1.5 text-brand-amber">
-                <Sparkles className="w-3.5 h-3.5" /> Evaluator Quick Login:
-              </span>
+          {/* Quick Evaluator Role Selector Chips (Development Only) */}
+          {process.env.NODE_ENV === "development" && (
+            <div className="mb-6 p-3 rounded-2xl bg-slate-950/60 border border-slate-800/80">
+              <div className="flex items-center justify-between text-xs text-slate-400 mb-2 font-medium">
+                <span className="flex items-center gap-1.5 text-brand-amber">
+                  <Sparkles className="w-3.5 h-3.5" /> Dev Quick Autofill:
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-xs">
+                {(["admin", "supervisor", "user"] as Role[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => handleQuickRole(r)}
+                    className="py-1.5 px-2 rounded-xl capitalize font-medium transition-all text-center border bg-slate-900 text-slate-300 border-slate-700/60 hover:bg-slate-800 hover:text-white"
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              {(["admin", "supervisor", "user"] as Role[]).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => handleQuickRole(r)}
-                  className={`py-1.5 px-2 rounded-xl capitalize font-medium transition-all text-center border ${
-                    selectedRole === r
-                      ? "bg-brand-amber text-slate-950 border-brand-amber font-semibold shadow-sm"
-                      : "bg-slate-900 text-slate-300 border-slate-700/60 hover:bg-slate-800"
-                  }`}
-                >
-                  {r}
-                </button>
-              ))}
-            </div>
-          </div>
+          )}
 
           {errorMsg && (
             <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs text-center font-medium">
@@ -184,24 +180,6 @@ export default function LoginPage() {
                   required
                   className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-brand-amber focus:ring-1 focus:ring-brand-amber transition-colors"
                 />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-300 uppercase tracking-wider mb-1.5">
-                Role Boundary
-              </label>
-              <div className="relative">
-                <UserCheck className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <select
-                  value={selectedRole}
-                  onChange={(e) => setSelectedRole(e.target.value as Role)}
-                  className="w-full pl-10 pr-4 py-2.5 bg-slate-950/80 border border-slate-800 rounded-xl text-sm text-slate-100 focus:outline-none focus:border-brand-amber focus:ring-1 focus:ring-brand-amber transition-colors capitalize"
-                >
-                  <option value="admin">Admin (Full Access + AI Assistant)</option>
-                  <option value="supervisor">Supervisor (Team & Lead Oversight)</option>
-                  <option value="user">Agent (Standard CRM Tasks)</option>
-                </select>
               </div>
             </div>
 

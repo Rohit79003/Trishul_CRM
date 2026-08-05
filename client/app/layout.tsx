@@ -3,6 +3,8 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { LoadingProvider } from "@/context/LoadingContext";
+import GlobalProgressBar from "@/components/ui/GlobalProgressBar";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -23,7 +25,12 @@ export default function RootLayout({
     <html lang="en" className="dark suppressHydrationWarning">
       <body className={`${inter.variable} font-sans`}>
         <ThemeProvider>
-          <AuthProvider>{children}</AuthProvider>
+          <AuthProvider>
+            <LoadingProvider>
+              <GlobalProgressBar />
+              {children}
+            </LoadingProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -89,9 +89,12 @@ exports.dashboardSummary = async (req, res, next) => {
 
 // @desc    Get detailed report metrics
 // @route   GET /api/reports/analytics
-// @access  Private
+// @access  Private (Admin, Supervisor)
 exports.getAnalytics = async (req, res, next) => {
   try {
+    if (req.user.role === 'user') {
+      return res.status(403).json({ message: 'Agents are not authorized to view reports.' });
+    }
     const leadSourceBreakdown = await Lead.aggregate([
       { $group: { _id: '$source', count: { $sum: 1 } } },
     ]);

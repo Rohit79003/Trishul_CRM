@@ -8,6 +8,7 @@ export interface User {
   supervisorId?: string;
   avatarUrl?: string;
   department?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface Customer {

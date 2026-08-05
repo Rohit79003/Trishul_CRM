@@ -6,10 +6,20 @@ import Card from "@/components/ui/Card";
 import ChatWidget from "@/components/ai/ChatWidget";
 import { Bot, ShieldAlert } from "lucide-react";
 
-export default function AIAssistantPage() {
-  const { user } = useAuth();
+import DataState from "@/components/ui/DataState";
 
-  if (user?.role !== "admin") {
+export default function AIAssistantPage() {
+  const { user, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <DataState loading={true} loadingMessage="Verifying permissions...">
+        <div className="h-48" />
+      </DataState>
+    );
+  }
+
+  if (!user || user.role !== "admin") {
     return (
       <Card className="p-8 text-center max-w-lg mx-auto my-12 space-y-4">
         <div className="p-4 rounded-full bg-rose-500/10 text-rose-500 w-16 h-16 mx-auto flex items-center justify-center">
@@ -19,7 +29,7 @@ export default function AIAssistantPage() {
           Admin Access Boundary Restricted
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          The AI Assistant co-pilot module is restricted strictly to users with the <strong className="text-brand-amber">Admin</strong> role. Your current role is <strong className="capitalize text-slate-300">{user?.role}</strong>.
+          The AI Assistant co-pilot module is restricted strictly to users with the <strong className="text-brand-amber">Admin</strong> role. Your current role is <strong className="capitalize text-slate-300">{user?.role || "unassigned"}</strong>.
         </p>
         <p className="text-[11px] text-slate-400">
           Use the Topbar role toggle or Login page to switch your active role to Admin to interact with Trishul AI.

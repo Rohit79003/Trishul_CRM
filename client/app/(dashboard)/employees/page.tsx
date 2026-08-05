@@ -8,6 +8,7 @@ import { User, Role } from "@/types";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
+import DataState from "@/components/ui/DataState";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import {
@@ -20,8 +21,8 @@ import {
 } from "lucide-react";
 
 export default function EmployeesPage() {
-  const { user: currentUser } = useAuth();
-  const { data: initialUsers, loading, error: fetchError } = useFetch<User[]>("/users");
+  const { user: currentUser, isLoading: isAuthLoading } = useAuth();
+  const { data: initialUsers, loading, error: fetchError, refetch } = useFetch<User[]>("/users");
   const [employees, setEmployees] = useState<User[]>([]);
   const [actionError, setActionError] = useState<string>("");
 
@@ -31,12 +32,13 @@ export default function EmployeesPage() {
   const [editingEmployee, setEditingEmployee] = useState<User | null>(null);
   const [employeeToDelete, setEmployeeToDelete] = useState<User | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [tempPasswordAlert, setTempPasswordAlert] = useState<{ email: string; pass: string } | null>(null);
 
   const [formData, setFormData] = useState({
     name: "",
     email: "",
+    password: "",
     role: "user" as Role,
-    supervisorId: "",
     department: "Field Sales",
   });
 
@@ -44,8 +46,17 @@ export default function EmployeesPage() {
     if (initialUsers) setEmployees(initialUsers);
   }, [initialUsers]);
 
-  // Client guard check for non-admin evaluators
-  if (currentUser?.role !== "admin") {
+  // Show clean spinner during initial auth hydration
+  if (isAuthLoading) {
+    return (
+      <DataState loading={true} loadingMessage="Verifying permissions...">
+        <div className="h-48" />
+      </DataState>
+    );
+  }
+
+  // Client guard check for non-admin evaluators (only shown when auth loading is finished and user is not admin)
+  if (!currentUser || currentUser.role !== "admin") {
     return (
       <Card className="p-8 text-center max-w-lg mx-auto my-12 space-y-4">
         <div className="p-4 rounded-full bg-rose-500/10 text-rose-500 w-16 h-16 mx-auto flex items-center justify-center">
@@ -55,7 +66,7 @@ export default function EmployeesPage() {
           Admin Access Boundary Restricted
         </h2>
         <p className="text-xs text-slate-500 dark:text-slate-400">
-          The Employees module is restricted strictly to users with the <strong className="text-brand-amber">Admin</strong> role. Your current role is <strong className="capitalize text-slate-300">{currentUser?.role}</strong>.
+          The Employees module is restricted strictly to users with the <strong className="text-brand-amber">Admin</strong> role. Your current role is <strong className="capitalize text-slate-300">{currentUser?.role || "unassigned"}</strong>.
         </p>
         <p className="text-[11px] text-slate-400">
           Use the Topbar dropdown or Login page to switch your active role to Admin to view and manage team members.
@@ -70,8 +81,8 @@ export default function EmployeesPage() {
     setFormData({
       name: "",
       email: "",
+      password: "",
       role: "user",
-      supervisorId: "",
       department: "Field Sales",
     });
     setIsModalOpen(true);
@@ -80,15 +91,19 @@ export default function EmployeesPage() {
   const handleOpenEdit = (emp: User) => {
     setActionError("");
     setEditingEmployee(emp);
-    const supervisorStr = typeof emp.supervisorId === "object" && emp.supervisorId !== null ? ((emp.supervisorId as any).id || (emp.supervisorId as any)._id) : (emp.supervisorId || "");
     setFormData({
       name: emp.name,
       email: emp.email,
+      password: "",
       role: emp.role,
-      supervisorId: supervisorStr,
       department: emp.department || "Sales",
     });
     setIsModalOpen(true);
+  };
+
+  const handleGeneratePassword = () => {
+    const generated = "Trishul#" + Math.random().toString(36).substring(2, 7) + "!";
+    setFormData((prev) => ({ ...prev, password: generated }));
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -103,8 +118,14 @@ export default function EmployeesPage() {
           prev.map((emp) => ((emp.id || (emp as any)._id) === id ? res.data : emp))
         );
       } else {
-        const res = await api.post("/users", { ...formData, password: "password123" });
+        const res = await api.post("/users", formData);
         setEmployees((prev) => [res.data, ...prev]);
+        if (res.data.initialPassword) {
+          setTempPasswordAlert({
+            email: res.data.email,
+            pass: res.data.initialPassword,
+          });
+        }
       }
       setIsModalOpen(false);
     } catch (err: any) {
@@ -231,20 +252,37 @@ export default function EmployeesPage() {
         </Button>
       </div>
 
-      {fetchError && (
-        <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-medium">
-          Failed to fetch employee list from backend API. Please verify server connection.
+      {tempPasswordAlert && (
+        <div className="p-4 rounded-2xl bg-amber-500/15 border border-amber-500/30 text-amber-500 flex items-center justify-between gap-4">
+          <div className="text-xs space-y-1">
+            <span className="font-bold text-amber-400">⚡ Employee Account Created! Temporary Credentials:</span>
+            <div className="font-mono text-slate-200">
+              User: <strong>{tempPasswordAlert.email}</strong> | Temp Password: <code className="bg-slate-900 px-2 py-0.5 rounded border border-slate-700 text-brand-amber select-all">{tempPasswordAlert.pass}</code>
+            </div>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              navigator.clipboard.writeText(`Email: ${tempPasswordAlert.email}\nPassword: ${tempPasswordAlert.pass}`);
+              alert("Credentials copied to clipboard!");
+            }}
+          >
+            Copy Credentials
+          </Button>
         </div>
       )}
 
       {/* Table */}
-      <Table
-        columns={columns}
-        data={employees}
-        isLoading={loading}
-        emptyMessage="No employees registered in system."
-        keyExtractor={(item) => item.id || (item as any)._id}
-      />
+      <DataState loading={loading} error={fetchError} onRetry={refetch}>
+        <Table
+          columns={columns}
+          data={employees}
+          isLoading={loading}
+          emptyMessage="No employees registered in system."
+          keyExtractor={(item) => item.id || (item as any)._id}
+        />
+      </DataState>
 
       {/* Add / Edit Modal */}
       <Modal
@@ -285,6 +323,30 @@ export default function EmployeesPage() {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
               />
             </div>
+
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  {editingEmployee ? "New Password (Optional)" : "Temporary Password"}
+                </label>
+                {!editingEmployee && (
+                  <button
+                    type="button"
+                    onClick={handleGeneratePassword}
+                    className="text-[11px] text-brand-amber hover:underline font-medium"
+                  >
+                    🎲 Auto-Generate
+                  </button>
+                )}
+              </div>
+              <input
+                type="text"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder={editingEmployee ? "Leave blank to keep existing password" : "e.g. Trishul#9x2K! (auto-generated if empty)"}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none font-mono"
+              />
+            </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Role Boundary *
@@ -297,23 +359,6 @@ export default function EmployeesPage() {
                 <option value="admin">Admin (Full Control)</option>
                 <option value="supervisor">Supervisor (Team Oversight)</option>
                 <option value="user">User / Agent (Standard Workflows)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Supervisor Assignment
-              </label>
-              <select
-                value={formData.supervisorId}
-                onChange={(e) => setFormData({ ...formData, supervisorId: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
-              >
-                <option value="">None / Executive</option>
-                {employees.map((e) => (
-                  <option key={e.id || (e as any)._id} value={e.id || (e as any)._id}>
-                    {e.name} ({e.role})
-                  </option>
-                ))}
               </select>
             </div>
           </div>

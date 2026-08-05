@@ -7,6 +7,7 @@ import LeadsLineChart from "@/components/charts/LeadsLineChart";
 import GrowthBarChart from "@/components/charts/GrowthBarChart";
 import ReportsPieChart from "@/components/charts/ReportsPieChart";
 import useFetch from "@/hooks/useFetch";
+import DataState from "@/components/ui/DataState";
 import { exportToPDF } from "@/lib/exportPDF";
 import { exportToExcel } from "@/lib/exportExcel";
 import {
@@ -20,9 +21,37 @@ import {
   Award,
 } from "lucide-react";
 
+import useAuth from "@/hooks/useAuth";
+import { ShieldAlert } from "lucide-react";
+
 export default function ReportsPage() {
+  const { user: currentUser, isLoading: isAuthLoading } = useAuth();
   const [timeRange, setTimeRange] = useState("Q3-2026");
-  const { data: analyticsData } = useFetch<any>("/reports/analytics");
+  const { data: analyticsData, loading, error, refetch } = useFetch<any>("/reports/analytics");
+
+  if (isAuthLoading) {
+    return (
+      <DataState loading={true} loadingMessage="Verifying permissions...">
+        <div className="h-48" />
+      </DataState>
+    );
+  }
+
+  if (!currentUser || currentUser.role === "user") {
+    return (
+      <Card className="p-8 text-center max-w-lg mx-auto my-12 space-y-4">
+        <div className="p-4 rounded-full bg-rose-500/10 text-rose-500 w-16 h-16 mx-auto flex items-center justify-center">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-slate-900 dark:text-white">
+          Reports Boundary Restricted
+        </h2>
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          The Reports module is restricted strictly to users with <strong className="text-brand-amber">Admin</strong> or <strong className="text-brand-amber">Supervisor</strong> roles. Your current role is <strong className="capitalize text-slate-300">{currentUser?.role || "agent"}</strong>.
+        </p>
+      </Card>
+    );
+  }
 
   const pieData = analyticsData?.leadSourceBreakdown?.length
     ? analyticsData.leadSourceBreakdown.map((item: any) => ({
@@ -133,35 +162,37 @@ export default function ReportsPage() {
       </Card>
 
       {/* Charts Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card animateHover={false} className="p-6 lg:col-span-2 space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-brand-amber" /> Lead Conversion Growth
-            </h3>
-            <span className="text-xs text-slate-400 font-mono">{timeRange}</span>
-          </div>
-          <LeadsLineChart />
-        </Card>
+      <DataState loading={loading} error={error} onRetry={refetch}>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <Card animateHover={false} className="p-6 lg:col-span-2 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-brand-amber" /> Lead Conversion Growth
+              </h3>
+              <span className="text-xs text-slate-400 font-mono">{timeRange}</span>
+            </div>
+            <LeadsLineChart />
+          </Card>
+
+          <Card animateHover={false} className="p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                <PieIcon className="w-4 h-4 text-sky-400" /> Channel Breakdown
+              </h3>
+            </div>
+            <ReportsPieChart data={pieData} />
+          </Card>
+        </div>
 
         <Card animateHover={false} className="p-6 space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-bold text-slate-900 dark:text-white flex items-center gap-2">
-              <PieIcon className="w-4 h-4 text-sky-400" /> Channel Breakdown
+            <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+              Quarterly Revenue vs Target Performance
             </h3>
           </div>
-          <ReportsPieChart data={pieData} />
+          <GrowthBarChart />
         </Card>
-      </div>
-
-      <Card animateHover={false} className="p-6 space-y-3">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-            Quarterly Revenue vs Target Performance
-          </h3>
-        </div>
-        <GrowthBarChart />
-      </Card>
+      </DataState>
     </div>
   );
 }

@@ -47,20 +47,26 @@ exports.create = async (req, res, next) => {
       return res.status(400).json({ message: 'User with this email already exists.' });
     }
 
+    // Generate random secure temporary password if custom password not specified
+    const tempPassword = password && password.trim().length >= 6
+      ? password.trim()
+      : 'Trishul#' + Math.random().toString(36).substring(2, 7) + '!';
+
     const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password || 'password123', salt);
+    const passwordHash = await bcrypt.hash(tempPassword, salt);
 
     const user = await User.create({
       name,
       email,
       passwordHash,
       role: role || 'user',
-      supervisorId: supervisorId || null,
+      supervisorId: req.user.id,
       department: department || 'Sales',
+      mustChangePassword: true,
     });
 
-    const result = await User.findById(user._id).select('-passwordHash');
-    res.status(201).json(result);
+    const result = await User.findById(user._id).select('-passwordHash').lean();
+    res.status(201).json({ ...result, id: result._id, initialPassword: tempPassword });
   } catch (error) {
     next(error);
   }

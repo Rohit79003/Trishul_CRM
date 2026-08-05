@@ -3,25 +3,29 @@
 import React, { useState } from "react";
 import useFetch from "@/hooks/useFetch";
 import api from "@/lib/api";
-import { Task } from "@/types";
+import { Task, User } from "@/types";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
+import DataState from "@/components/ui/DataState";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   CheckSquare,
   Plus,
   Calendar,
-  User,
+  User as UserIcon,
   CheckCircle2,
   Circle,
   Filter,
   Trash2,
 } from "lucide-react";
+import useAuth from "@/hooks/useAuth";
 
 export default function TasksPage() {
-  const { data: initialTasks, loading, error: fetchError } = useFetch<Task[]>("/tasks");
+  const { user: currentUser } = useAuth();
+  const { data: initialTasks, loading, error: fetchError, refetch } = useFetch<Task[]>("/tasks");
+  const { data: usersList } = useFetch<User[]>("/users");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
@@ -36,24 +40,24 @@ export default function TasksPage() {
     assignedTo: "",
     dueDate: new Date().toISOString().split("T")[0],
     priority: "medium" as Task["priority"],
-    category: "Sales Follow-up",
+    category: "Sales",
   });
 
   React.useEffect(() => {
     if (initialTasks) setTasks(initialTasks);
   }, [initialTasks]);
 
-  const toggleTaskComplete = async (taskId: string) => {
-    const target = tasks.find((t) => (t.id || (t as any)._id) === taskId);
+  const toggleTaskComplete = async (id: string) => {
+    const target = tasks.find((t) => (t.id || (t as any)._id) === id);
     if (!target) return;
-    const newCompleted = !target.completed;
+    const newStatus = !target.completed;
+    setTasks((prev) =>
+      prev.map((t) => ((t.id || (t as any)._id) === id ? { ...t, completed: newStatus } : t))
+    );
     try {
-      const res = await api.put(`/tasks/${taskId}`, { completed: newCompleted });
-      setTasks((prev) =>
-        prev.map((t) => ((t.id || (t as any)._id) === taskId ? res.data : t))
-      );
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to update task completion");
+      await api.put(`/tasks/${id}`, { completed: newStatus });
+    } catch (err) {
+      refetch();
     }
   };
 
@@ -65,7 +69,7 @@ export default function TasksPage() {
       assignedTo: "",
       dueDate: new Date().toISOString().split("T")[0],
       priority: "medium",
-      category: "Sales Follow-up",
+      category: "Sales",
     });
     setIsModalOpen(true);
   };
@@ -93,20 +97,18 @@ export default function TasksPage() {
     }
   };
 
-  const deleteTask = async (taskId: string) => {
+  const deleteTask = async (id: string) => {
+    setTasks((prev) => prev.filter((t) => (t.id || (t as any)._id) !== id));
     try {
-      await api.delete(`/tasks/${taskId}`);
-      setTasks((prev) => prev.filter((t) => (t.id || (t as any)._id) !== taskId));
-    } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to delete task.");
+      await api.delete(`/tasks/${id}`);
+    } catch (err) {
+      refetch();
     }
   };
 
   const filteredTasks = tasks.filter((t) => {
-    const matchesPriority = filterPriority === "all" || t.priority === filterPriority;
-    const assigneeName = typeof t.assignedTo === "object" && t.assignedTo !== null ? ((t.assignedTo as any).name || (t.assignedTo as any).email) : t.assignedTo;
-    const matchesAssignee = filterAssignee === "all" || assigneeName === filterAssignee;
-    return matchesPriority && matchesAssignee;
+    if (filterPriority !== "all" && t.priority !== filterPriority) return false;
+    return true;
   });
 
   return (
@@ -122,14 +124,16 @@ export default function TasksPage() {
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          onClick={handleOpenAdd}
-          icon={<Plus className="w-4 h-4" />}
-        >
-          Create New Task
-        </Button>
+        {currentUser?.role !== "user" && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={handleOpenAdd}
+            icon={<Plus className="w-4 h-4" />}
+          >
+            Create New Task
+          </Button>
+        )}
       </div>
 
       {fetchError && (
@@ -166,85 +170,90 @@ export default function TasksPage() {
       </Card>
 
       {/* Animated Task List */}
-      <div className="space-y-3">
-        <AnimatePresence>
-          {filteredTasks.length === 0 ? (
-            <Card animateHover={false} className="p-8 text-center text-slate-500">
-              No tasks match your selected filter criteria.
-            </Card>
-          ) : (
-            filteredTasks.map((t) => {
-              const taskId = t.id || (t as any)._id;
-              return (
-                <motion.div
-                  key={taskId}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <Card
-                    animateHover={false}
-                    className={`p-4 transition-all ${
-                      t.completed
-                        ? "bg-slate-50/50 dark:bg-slate-900/40 opacity-75 border-slate-200/50 dark:border-slate-800/40"
-                        : "hover:border-brand-amber/40"
-                    }`}
+      <DataState loading={loading} error={fetchError} onRetry={refetch}>
+        <div className="space-y-3">
+          <AnimatePresence>
+            {filteredTasks.length === 0 ? (
+              <Card animateHover={false} className="p-8 text-center text-slate-500">
+                No tasks match your selected filter criteria.
+              </Card>
+            ) : (
+              filteredTasks.map((t) => {
+                const taskId = t.id || (t as any)._id;
+                return (
+                  <motion.div
+                    key={taskId}
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.2 }}
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      {/* Left Checkbox & Title */}
-                      <div className="flex items-center gap-3.5 flex-1 min-w-0">
-                        <button
-                          onClick={() => toggleTaskComplete(taskId)}
-                          className="text-brand-amber hover:scale-110 transition-transform shrink-0"
-                          title={t.completed ? "Mark incomplete" : "Mark completed"}
-                        >
-                          {t.completed ? (
-                            <CheckCircle2 className="w-6 h-6 text-emerald-500 fill-emerald-500/20" />
-                          ) : (
-                            <Circle className="w-6 h-6 text-slate-400 hover:text-brand-amber" />
-                          )}
-                        </button>
-
-                        <div className="truncate">
-                          <h4
-                            className={`text-sm font-semibold truncate ${
-                              t.completed
-                                ? "line-through text-slate-400 dark:text-slate-500"
-                                : "text-slate-900 dark:text-slate-100"
-                            }`}
+                    <Card
+                      animateHover={false}
+                      className={`p-4 transition-all ${
+                        t.completed
+                          ? "bg-slate-50/50 dark:bg-slate-900/40 opacity-75 border-slate-200/50 dark:border-slate-800/40"
+                          : "hover:border-brand-amber/40"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-4">
+                        {/* Left Checkbox & Title */}
+                        <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                          <button
+                            onClick={() => toggleTaskComplete(taskId)}
+                            className="text-brand-amber hover:scale-110 transition-transform shrink-0"
+                            title={t.completed ? "Mark incomplete" : "Mark completed"}
                           >
-                            {t.title}
-                          </h4>
-                          <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                            <span className="flex items-center gap-1">
-                              <User className="w-3 h-3 text-brand-amber" /> {typeof t.assignedTo === "object" && t.assignedTo !== null ? ((t.assignedTo as any).name || (t.assignedTo as any).email || "Unassigned") : (t.assignedTo || "Unassigned")}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Calendar className="w-3 h-3 text-sky-400" /> Due: {t.dueDate ? String(t.dueDate).split("T")[0] : "No date"}
-                            </span>
+                            {t.completed ? (
+                              <CheckCircle2 className="w-6 h-6 text-emerald-500 fill-emerald-500/20" />
+                            ) : (
+                              <Circle className="w-6 h-6 text-slate-400 hover:text-brand-amber" />
+                            )}
+                          </button>
+
+                          <div className="truncate">
+                            <h4
+                              className={`text-sm font-semibold truncate ${
+                                t.completed
+                                  ? "line-through text-slate-400 dark:text-slate-500"
+                                  : "text-slate-900 dark:text-slate-100"
+                              }`}
+                            >
+                              {t.title}
+                            </h4>
+                            <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                              <span className="flex items-center gap-1">
+                                <UserIcon className="w-3 h-3 text-brand-amber" /> {typeof t.assignedTo === "object" && t.assignedTo !== null ? ((t.assignedTo as any).name || (t.assignedTo as any).email || "Unassigned") : (t.assignedTo || "Unassigned")}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Calendar className="w-3 h-3 text-sky-400" /> Due: {t.dueDate ? String(t.dueDate).split("T")[0] : "No date"}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      {/* Right Badges & Controls */}
-                      <div className="flex items-center gap-3 shrink-0">
-                        <Badge variant={t.priority} />
-                        <button
-                          onClick={() => deleteTask(taskId)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {/* Right Badges & Controls */}
+                        <div className="flex items-center gap-3 shrink-0">
+                          <Badge variant={t.priority} />
+                          {currentUser?.role !== "user" && (
+                            <button
+                              onClick={() => deleteTask(taskId)}
+                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+                              title="Delete Task"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              );
-            })
-          )}
-        </AnimatePresence>
-      </div>
+                    </Card>
+                  </motion.div>
+                );
+              })
+            )}
+          </AnimatePresence>
+        </div>
+      </DataState>
 
       {/* Modal Add Task */}
       <Modal
@@ -277,15 +286,23 @@ export default function TasksPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                Assignee
+                Assignee (Team Member)
               </label>
-              <input
-                type="text"
-                placeholder="Agent Name or ID"
+              <select
                 value={formData.assignedTo}
                 onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
-              />
+              >
+                <option value="">Select an Assignee...</option>
+                <option value="Agent User">Agent User (agent@trishul.com)</option>
+                <option value="Supervisor User">Supervisor User (supervisor@trishul.com)</option>
+                <option value="Admin User">Admin User (admin@trishul.com)</option>
+                {usersList?.map((u) => (
+                  <option key={u.id || (u as any)._id} value={u.name || u.email}>
+                    {u.name} ({u.email} - {u.role})
+                  </option>
+                ))}
+              </select>
             </div>
 
             <div>

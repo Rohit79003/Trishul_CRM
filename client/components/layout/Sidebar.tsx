@@ -35,9 +35,9 @@ const MENU_ITEMS: MenuItem[] = [
   { name: "Leads Pipeline", href: "/leads", icon: Target, roles: ["admin", "supervisor", "user"] },
   { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ["admin", "supervisor", "user"] },
   { name: "Employees", href: "/employees", icon: UserCog, roles: ["admin"] },
-  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "supervisor", "user"] },
+  { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { name: "AI Assistant", href: "/ai-assistant", icon: Bot, roles: ["admin"] },
-  { name: "Settings", href: "/settings", icon: Settings, roles: ["admin", "supervisor", "user"] },
+  { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
 ];
 
 export const Sidebar: React.FC = () => {
@@ -86,24 +86,9 @@ export const Sidebar: React.FC = () => {
 
       {/* Navigation Links */}
       <div className="flex-1 py-4 px-3 space-y-1.5 overflow-y-auto">
-        {MENU_ITEMS.map((item) => {
-          const isAllowed = item.roles.includes(currentRole);
+        {MENU_ITEMS.filter((item) => item.roles.includes(currentRole)).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;
-
-          if (!isAllowed) {
-            return (
-              <div
-                key={item.href}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-slate-600 dark:text-slate-600 text-sm cursor-not-allowed opacity-50 relative group"
-                title="Admin permission required"
-              >
-                <Icon className="w-5 h-5 shrink-0" />
-                {!collapsed && <span className="truncate">{item.name}</span>}
-                {!collapsed && <Lock className="w-3.5 h-3.5 ml-auto text-slate-600" />}
-              </div>
-            );
-          }
 
           return (
             <Link

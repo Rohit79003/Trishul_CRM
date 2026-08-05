@@ -61,19 +61,34 @@ const mongoose = require('mongoose');
 
 async function resolveAssigneeId(assignedTo, defaultUserId) {
   if (!assignedTo) return defaultUserId;
-  if (mongoose.Types.ObjectId.isValid(assignedTo)) return assignedTo;
+
+  if (mongoose.Types.ObjectId.isValid(assignedTo)) {
+    const userById = await User.findById(assignedTo);
+    if (userById) return userById._id;
+  }
 
   const user = await User.findOne({
     $or: [{ name: assignedTo }, { email: assignedTo }],
   });
-  return user ? user._id : defaultUserId;
+
+  if (!user) {
+    const err = new Error('User not exist');
+    err.statusCode = 400;
+    throw err;
+  }
+
+  return user._id;
 }
 
 // @desc    Create a new lead opportunity
 // @route   POST /api/leads
-// @access  Private
+// @access  Private (Admin, Supervisor)
 exports.create = async (req, res, next) => {
   try {
+    if (req.user.role === 'user') {
+      return res.status(403).json({ message: 'Agents are not authorized to create lead opportunities.' });
+    }
+
     const { name, company, phone, email, source, status, value, assignedTo } = req.body;
     const assigneeId = await resolveAssigneeId(assignedTo, req.user.id);
 
@@ -107,7 +122,10 @@ exports.update = async (req, res, next) => {
     }
 
     const updateFields = { ...req.body };
-    if (updateFields.assignedTo) {
+    if (req.user.role === 'user') {
+      // Agents can update status & details, but not reassign leads
+      delete updateFields.assignedTo;
+    } else if (updateFields.assignedTo) {
       updateFields.assignedTo = await resolveAssigneeId(updateFields.assignedTo, lead.assignedTo);
     }
 
@@ -127,6 +145,10 @@ exports.update = async (req, res, next) => {
 // @access  Private (Admin, Supervisor)
 exports.remove = async (req, res, next) => {
   try {
+    if (req.user.role === 'user') {
+      return res.status(403).json({ message: 'Agents are not authorized to delete lead opportunities.' });
+    }
+
     const lead = await Lead.findById(req.params.id);
     if (!lead) {
       return res.status(404).json({ message: 'Lead record not found.' });

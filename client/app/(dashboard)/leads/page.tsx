@@ -7,6 +7,7 @@ import { Lead } from "@/types";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
+import DataState from "@/components/ui/DataState";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { exportToPDF } from "@/lib/exportPDF";
@@ -24,8 +25,11 @@ import {
   User,
 } from "lucide-react";
 
+import useAuth from "@/hooks/useAuth";
+
 export default function LeadsPage() {
-  const { data: initialLeads, loading, error: fetchError } = useFetch<Lead[]>("/leads");
+  const { user: currentUser } = useAuth();
+  const { data: initialLeads, loading, error: fetchError, refetch } = useFetch<Lead[]>("/leads");
   const [leads, setLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -271,17 +275,19 @@ export default function LeadsPage() {
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setActionError("");
-              setLeadToDelete(row);
-              setIsDeleteOpen(true);
-            }}
-            className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
-            title="Delete Lead"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {currentUser?.role !== "user" && (
+            <button
+              onClick={() => {
+                setActionError("");
+                setLeadToDelete(row);
+                setIsDeleteOpen(true);
+              }}
+              className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+              title="Delete Lead"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -317,14 +323,16 @@ export default function LeadsPage() {
           >
             Excel Export
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenAdd}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            New Lead
-          </Button>
+          {currentUser?.role !== "user" && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenAdd}
+              icon={<Plus className="w-4 h-4" />}
+            >
+              New Lead
+            </Button>
+          )}
         </div>
       </div>
 
@@ -372,13 +380,15 @@ export default function LeadsPage() {
       </Card>
 
       {/* Table */}
-      <Table
-        columns={columns}
-        data={filteredLeads}
-        isLoading={loading}
-        emptyMessage="No matching lead opportunities found."
-        keyExtractor={(item) => item.id || (item as any)._id}
-      />
+      <DataState loading={loading} error={fetchError} onRetry={refetch}>
+        <Table
+          columns={columns}
+          data={filteredLeads}
+          isLoading={loading}
+          emptyMessage="No matching lead opportunities found."
+          keyExtractor={(item) => item.id || (item as any)._id}
+        />
+      </DataState>
 
       {/* Modal Add / Edit */}
       <Modal

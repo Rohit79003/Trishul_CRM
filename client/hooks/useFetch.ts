@@ -1,7 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/api";
 
-export function useFetch<T>(url: string, initialData: T | null = null) {
+interface UseFetchOptions {
+  showGlobalLoader?: boolean;
+}
+
+export function useFetch<T>(
+  url: string,
+  initialData: T | null = null,
+  options: UseFetchOptions = { showGlobalLoader: true }
+) {
   const [data, setData] = useState<T | null>(initialData);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -10,14 +18,21 @@ export function useFetch<T>(url: string, initialData: T | null = null) {
     setLoading(true);
     setError(null);
     try {
-      const response = await api.get(url);
+      const response = await api.get(url, {
+        showGlobalLoader: options.showGlobalLoader ?? true,
+      });
       setData(response.data);
     } catch (err: any) {
-      setError(err?.response?.data?.message || err?.message || "Failed to fetch data");
+      const errMsg =
+        err?.response?.data?.message ||
+        (err.code === "ERR_NETWORK"
+          ? "Cannot connect to server. Please check backend server connection."
+          : err?.message || "Failed to fetch data");
+      setError(errMsg);
     } finally {
       setLoading(false);
     }
-  }, [url]);
+  }, [url, options.showGlobalLoader]);
 
   useEffect(() => {
     fetchData();

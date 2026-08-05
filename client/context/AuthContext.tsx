@@ -10,7 +10,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isLoading: boolean;
-  login: (email: string, password?: string, role?: Role) => Promise<void>;
+  login: (email: string, password?: string) => Promise<void>;
   logout: () => void;
   switchRole: (role: Role) => void;
   refreshUser: () => Promise<void>;
@@ -34,10 +34,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           id: u.id || u._id,
           name: u.name,
           email: u.email,
-          role: u.role || "admin",
+          role: u.role || "user",
           department: u.department || "General",
           supervisorId: u.supervisorId,
           avatarUrl: u.avatarUrl,
+          mustChangePassword: !!u.mustChangePassword,
         };
         setUser(normalizedUser);
         localStorage.setItem("trishul_user", JSON.stringify(normalizedUser));
@@ -73,7 +74,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const login = async (email: string, password?: string, role?: Role) => {
+  const login = async (email: string, password?: string) => {
     setIsLoading(true);
     try {
       const response = await api.post("/auth/login", { email, password });
@@ -83,7 +84,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         id: apiUser.id || apiUser._id,
         name: apiUser.name,
         email: apiUser.email,
-        role: apiUser.role || role || "admin",
+        role: apiUser.role || "user",
         supervisorId: apiUser.supervisorId,
         department: apiUser.department,
         avatarUrl: apiUser.avatarUrl,

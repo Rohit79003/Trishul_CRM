@@ -7,6 +7,7 @@ import { Customer } from "@/types";
 import Card from "@/components/ui/Card";
 import Button from "@/components/ui/Button";
 import Table, { Column } from "@/components/ui/Table";
+import DataState from "@/components/ui/DataState";
 import Badge from "@/components/ui/Badge";
 import Modal from "@/components/ui/Modal";
 import { exportToPDF } from "@/lib/exportPDF";
@@ -24,7 +25,10 @@ import {
   Building,
 } from "lucide-react";
 
+import useAuth from "@/hooks/useAuth";
+
 export default function CustomersPage() {
+  const { user: currentUser } = useAuth();
   const { data: initialCustomers, loading, error: fetchError, refetch } = useFetch<Customer[]>("/customers");
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
@@ -233,17 +237,19 @@ export default function CustomersPage() {
           >
             <Edit2 className="w-4 h-4" />
           </button>
-          <button
-            onClick={() => {
-              setActionError("");
-              setCustomerToDelete(row);
-              setIsDeleteOpen(true);
-            }}
-            className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
-            title="Delete Customer"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
+          {currentUser?.role !== "user" && (
+            <button
+              onClick={() => {
+                setActionError("");
+                setCustomerToDelete(row);
+                setIsDeleteOpen(true);
+              }}
+              className="p-1.5 text-slate-500 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+              title="Delete Customer"
+            >
+              <Trash2 className="w-4 h-4" />
+            </button>
+          )}
         </div>
       ),
     },
@@ -279,14 +285,16 @@ export default function CustomersPage() {
           >
             Excel Export
           </Button>
-          <Button
-            variant="primary"
-            size="sm"
-            onClick={handleOpenAdd}
-            icon={<Plus className="w-4 h-4" />}
-          >
-            Add Customer
-          </Button>
+          {currentUser?.role !== "user" && (
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleOpenAdd}
+              icon={<Plus className="w-4 h-4" />}
+            >
+              Add Customer
+            </Button>
+          )}
         </div>
       </div>
 
@@ -334,13 +342,15 @@ export default function CustomersPage() {
       </Card>
 
       {/* Customer Data Table */}
-      <Table
-        columns={columns}
-        data={filteredCustomers}
-        isLoading={loading}
-        emptyMessage="No matching customer records found."
-        keyExtractor={(item) => item.id || (item as any)._id}
-      />
+      <DataState loading={loading} error={fetchError} onRetry={refetch}>
+        <Table
+          columns={columns}
+          data={filteredCustomers}
+          isLoading={loading}
+          emptyMessage="No matching customer records found."
+          keyExtractor={(item) => item.id || (item as any)._id}
+        />
+      </DataState>
 
       {/* Add / Edit Modal */}
       <Modal

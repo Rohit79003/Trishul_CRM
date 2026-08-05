@@ -1,4 +1,4 @@
-// Web Audio API Sound Effects Synthesizer for Trishul Intro
+// Web Audio API Sound Effects Synthesizer for Trishul Intro (All 12 Phases)
 class SoundEffectsController {
   private ctx: AudioContext | null = null;
   private isMuted: boolean = false;
@@ -42,7 +42,7 @@ class SoundEffectsController {
       const filter = this.ctx.createBiquadFilter();
 
       osc.type = "sine";
-      osc.frequency.setValueAtTime(45, this.ctx.currentTime); // Low 45Hz sub-bass hum
+      osc.frequency.setValueAtTime(45, this.ctx.currentTime);
       osc.frequency.exponentialRampToValueAtTime(80, this.ctx.currentTime + 1.5);
 
       filter.type = "lowpass";
@@ -58,12 +58,65 @@ class SoundEffectsController {
 
       osc.start();
       osc.stop(this.ctx.currentTime + 1.8);
-    } catch (e) {
-      // Audio context policy fallback
-    }
+    } catch (e) {}
   }
 
-  // Phase 3: High-speed drop whoosh
+  // Phase 3: Rotating energy hum
+  public playEnergyHum() {
+    if (this.getMuted()) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(90, now);
+      osc.frequency.exponentialRampToValueAtTime(320, now + 1.4);
+
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.15, now + 0.5);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 1.4);
+    } catch (e) {}
+  }
+
+  // Phase 4: Lightning strike crack
+  public playLightningStrike() {
+    if (this.getMuted()) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const bufferSize = this.ctx.sampleRate * 0.3;
+      const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.2));
+      }
+
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = buffer;
+
+      const gain = this.ctx.createGain();
+      gain.gain.setValueAtTime(0.35, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+
+      noise.connect(gain);
+      gain.connect(this.ctx.destination);
+      noise.start(now);
+      noise.stop(now + 0.3);
+    } catch (e) {}
+  }
+
+  // Phase 5: High-speed drop whoosh
   public playDropWhoosh() {
     if (this.getMuted()) return;
     this.initCtx();
@@ -100,7 +153,7 @@ class SoundEffectsController {
     } catch (e) {}
   }
 
-  // Phase 4: Ground Impact explosion / sub-bass strike
+  // Phase 6: Ground Impact explosion / sub-bass strike
   public playImpactBoom() {
     if (this.getMuted()) return;
     this.initCtx();
@@ -113,10 +166,10 @@ class SoundEffectsController {
       const osc = this.ctx.createOscillator();
       const gain = this.ctx.createGain();
       osc.type = "triangle";
-      osc.frequency.setValueAtTime(150, now);
-      osc.frequency.exponentialRampToValueAtTime(30, now + 0.5);
+      osc.frequency.setValueAtTime(160, now);
+      osc.frequency.exponentialRampToValueAtTime(28, now + 0.6);
 
-      gain.gain.setValueAtTime(0.4, now);
+      gain.gain.setValueAtTime(0.45, now);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
 
       osc.connect(gain);
@@ -128,10 +181,10 @@ class SoundEffectsController {
       const snapOsc = this.ctx.createOscillator();
       const snapGain = this.ctx.createGain();
       snapOsc.type = "sawtooth";
-      snapOsc.frequency.setValueAtTime(600, now);
-      snapOsc.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+      snapOsc.frequency.setValueAtTime(650, now);
+      snapOsc.frequency.exponentialRampToValueAtTime(90, now + 0.25);
 
-      snapGain.gain.setValueAtTime(0.25, now);
+      snapGain.gain.setValueAtTime(0.3, now);
       snapGain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
 
       snapOsc.connect(snapGain);
@@ -141,7 +194,32 @@ class SoundEffectsController {
     } catch (e) {}
   }
 
-  // Phase 5: Circular Energy Shockwave sweep
+  // Phase 7: Ground shatter crack
+  public playShatterCrack() {
+    if (this.getMuted()) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "square";
+      osc.frequency.setValueAtTime(800, now);
+      osc.frequency.exponentialRampToValueAtTime(150, now + 0.4);
+
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.4);
+    } catch (e) {}
+  }
+
+  // Phase 8: Circular Energy Shockwave sweep
   public playEnergyShockwave() {
     if (this.getMuted()) return;
     this.initCtx();
@@ -154,10 +232,10 @@ class SoundEffectsController {
 
       osc.type = "sine";
       osc.frequency.setValueAtTime(120, now);
-      osc.frequency.exponentialRampToValueAtTime(450, now + 0.5);
+      osc.frequency.exponentialRampToValueAtTime(480, now + 0.5);
 
       gain.gain.setValueAtTime(0.01, now);
-      gain.gain.linearRampToValueAtTime(0.18, now + 0.2);
+      gain.gain.linearRampToValueAtTime(0.2, now + 0.2);
       gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
 
       osc.connect(gain);
@@ -167,7 +245,33 @@ class SoundEffectsController {
     } catch (e) {}
   }
 
-  // Phase 7: Logo transformation chime / sparkle
+  // Phase 10: World Transformation digital sweep
+  public playTransformSweep() {
+    if (this.getMuted()) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    try {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(300, now);
+      osc.frequency.exponentialRampToValueAtTime(1200, now + 0.7);
+
+      gain.gain.setValueAtTime(0.01, now);
+      gain.gain.linearRampToValueAtTime(0.12, now + 0.3);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.8);
+    } catch (e) {}
+  }
+
+  // Phase 11: Logo transformation chime / sparkle
   public playLogoChime() {
     if (this.getMuted()) return;
     this.initCtx();
@@ -186,7 +290,7 @@ class SoundEffectsController {
 
         const startTime = now + idx * 0.08;
         gain.gain.setValueAtTime(0.01, startTime);
-        gain.gain.linearRampToValueAtTime(0.1, startTime + 0.05);
+        gain.gain.linearRampToValueAtTime(0.12, startTime + 0.05);
         gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.6);
 
         osc.connect(gain);
@@ -200,3 +304,4 @@ class SoundEffectsController {
 }
 
 export const soundFX = new SoundEffectsController();
+export default soundFX;

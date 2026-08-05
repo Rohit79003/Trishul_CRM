@@ -1,5 +1,18 @@
-import axios from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import Cookies from "js-cookie";
+import loadingService from "./LoadingService";
+
+// Extend Axios module interfaces to support custom options & request tracking
+declare module "axios" {
+  export interface AxiosRequestConfig {
+    showGlobalLoader?: boolean;
+    requestId?: string;
+  }
+  export interface InternalAxiosRequestConfig {
+    showGlobalLoader?: boolean;
+    requestId?: string;
+  }
+}
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
 
@@ -11,16 +24,26 @@ const api = axios.create({
   timeout: 10000,
 });
 
-// Request Interceptor: Attach JWT Bearer Token
+// Request Interceptor: Attach JWT Bearer Token & notify LoadingService
 api.interceptors.request.use(
-  (config) => {
+  (config: InternalAxiosRequestConfig) => {
     const token = Cookies.get("token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+
+    // Generate unique request ID unless explicitly opted out
+    if (config.showGlobalLoader !== false) {
+      const requestId = `req_${Math.random().toString(36).substring(2, 9)}_${Date.now()}`;
+      config.requestId = requestId;
+      loadingService.startRequest(requestId);
+    }
+
     return config;
   },
-  (error) => Promise.reject(error)
+  (error) => {
+    return Promise.reject(error);
+  }
 );
 
 // Helper function to normalize _id to id recursively across response objects
@@ -43,15 +66,25 @@ const normalizeData = (data: any): any => {
   return data;
 };
 
-// Response Interceptor: Normalize MongoDB _id to id and handle 401 Unauthorized globally
+// Response Interceptor: Normalize MongoDB _id to id, finish LoadingService request, and handle 401
 api.interceptors.response.use(
   (response) => {
+    const reqId = (response.config as any)?.requestId;
+    if (reqId) {
+      loadingService.finishRequest(reqId);
+    }
+
     if (response.data) {
       response.data = normalizeData(response.data);
     }
     return response;
   },
   (error) => {
+    const reqId = (error.config as any)?.requestId;
+    if (reqId) {
+      loadingService.finishRequest(reqId);
+    }
+
     // 401 Unauthorized handling: Clear invalid session token
     if (error.response && error.response.status === 401) {
       if (typeof window !== "undefined") {
