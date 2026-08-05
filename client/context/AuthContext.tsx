@@ -101,7 +101,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setIsLoading(false);
       const message =
         err.response?.data?.message ||
-        (err.code === "ERR_NETWORK" ? "Cannot connect to server. Make sure server is running on port 5000." : null) ||
+        (err.code === "ERR_NETWORK" ? "Cannot connect to server. Please verify your backend API URL." : null) ||
         "Invalid email or password.";
       throw new Error(message);
     }
