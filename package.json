@@ -1,0 +1,13 @@
+{
+  "name": "trishul-crm-root",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "npm --prefix client run dev",
+    "dev:client": "npm --prefix client run dev",
+    "dev:server": "npm --prefix server run dev",
+    "start:server": "node server/server.js",
+    "seed:server": "node server/seed.js",
+    "build:client": "npm --prefix client run build"
+  }
+}
