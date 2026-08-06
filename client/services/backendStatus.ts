@@ -25,14 +25,18 @@ class BackendStatusService {
   private healthUrl: string;
 
   constructor() {
-    const rawApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
-    // Target both /api/health or root /health
-    if (rawApiUrl.endsWith("/api")) {
-      this.healthUrl = `${rawApiUrl}/health`;
-    } else if (rawApiUrl.endsWith("/")) {
-      this.healthUrl = `${rawApiUrl}health`;
+    if (process.env.NEXT_PUBLIC_HEALTH_URL) {
+      this.healthUrl = process.env.NEXT_PUBLIC_HEALTH_URL;
+    } else if (process.env.NEXT_PUBLIC_API_URL) {
+      const rawApiUrl = process.env.NEXT_PUBLIC_API_URL;
+      if (rawApiUrl.endsWith("/health")) {
+        this.healthUrl = rawApiUrl;
+      } else {
+        const origin = rawApiUrl.replace(/\/api\/?$/, "").replace(/\/$/, "");
+        this.healthUrl = `${origin}/health`;
+      }
     } else {
-      this.healthUrl = `${rawApiUrl}/health`;
+      this.healthUrl = "https://trishul-crm.onrender.com/health";
     }
   }
 
@@ -68,29 +72,12 @@ class BackendStatusService {
     const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     try {
-      // Primary check
-      let response: Response;
-      try {
-        response = await fetch(this.healthUrl, {
-          method: "GET",
-          headers: { Accept: "application/json" },
-          signal: controller.signal,
-          cache: "no-store",
-        });
-      } catch (primaryErr) {
-        // Fallback check to root /health if API prefix failed
-        const fallbackUrl = this.healthUrl.replace(/\/api\/health$/, "/health");
-        if (fallbackUrl !== this.healthUrl) {
-          response = await fetch(fallbackUrl, {
-            method: "GET",
-            headers: { Accept: "application/json" },
-            signal: controller.signal,
-            cache: "no-store",
-          });
-        } else {
-          throw primaryErr;
-        }
-      }
+      const response = await fetch(this.healthUrl, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        signal: controller.signal,
+        cache: "no-store",
+      });
 
       clearTimeout(timeoutId);
 
