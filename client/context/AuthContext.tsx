@@ -44,13 +44,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         localStorage.setItem("trishul_user", JSON.stringify(normalizedUser));
         Cookies.set("role", normalizedUser.role, { expires: 7, path: "/" });
       }
-    } catch (err) {
-      // If token invalid, purge local session
-      Cookies.remove("token", { path: "/" });
-      Cookies.remove("role", { path: "/" });
-      localStorage.removeItem("trishul_user");
-      setToken(null);
-      setUser(null);
+    } catch (err: any) {
+      // Only purge local session if backend explicitly returned 401 Unauthorized
+      if (err.response && err.response.status === 401) {
+        Cookies.remove("token", { path: "/" });
+        Cookies.remove("role", { path: "/" });
+        localStorage.removeItem("trishul_user");
+        setToken(null);
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -100,10 +102,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       router.push("/dashboard");
     } catch (err: any) {
       setIsLoading(false);
-      const message =
-        err.response?.data?.message ||
-        (err.code === "ERR_NETWORK" ? "Cannot connect to server. Please verify your backend API URL." : null) ||
-        "Invalid email or password.";
+      const isNetworkOrColdStart =
+        err.code === "ERR_NETWORK" ||
+        err.code === "ECONNABORTED" ||
+        !err.response ||
+        err.response?.status === 503 ||
+        err.response?.status === 504;
+
+      const message = err.response?.data?.message || (isNetworkOrColdStart ? "Server is starting... Please wait a moment." : "Invalid email or password.");
       throw new Error(message);
     }
   };

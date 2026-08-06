@@ -2,9 +2,11 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/context/ThemeContext";
+import { BackendStatusProvider } from "@/context/BackendStatusProvider";
 import { AuthProvider } from "@/context/AuthContext";
 import { LoadingProvider } from "@/context/LoadingContext";
 import GlobalProgressBar from "@/components/ui/GlobalProgressBar";
+import ConnectionOverlay from "@/components/backend/ConnectionOverlay";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -25,12 +27,15 @@ export default function RootLayout({
     <html lang="en" className="dark suppressHydrationWarning">
       <body className={`${inter.variable} font-sans`}>
         <ThemeProvider>
-          <AuthProvider>
-            <LoadingProvider>
-              <GlobalProgressBar />
-              {children}
-            </LoadingProvider>
-          </AuthProvider>
+          <BackendStatusProvider>
+            <AuthProvider>
+              <LoadingProvider>
+                <GlobalProgressBar />
+                <ConnectionOverlay />
+                {children}
+              </LoadingProvider>
+            </AuthProvider>
+          </BackendStatusProvider>
         </ThemeProvider>
       </body>
     </html>

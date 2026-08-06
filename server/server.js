@@ -42,15 +42,17 @@ app.use(
 app.use(morgan('dev'));
 app.use(express.json());
 
-// Health Check Endpoint
-app.get('/health', (req, res) => {
+// Health Check Endpoints (Root & API prefix)
+const healthHandler = (req, res) => {
   res.status(200).json({
     status: 'OK',
     service: 'Trishul CRM REST API',
     database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
     timestamp: new Date().toISOString(),
   });
-});
+};
+app.get('/health', healthHandler);
+app.get('/api/health', healthHandler);
 
 // API Routes Mounting
 app.use('/api/auth', authRoutes);

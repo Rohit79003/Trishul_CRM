@@ -3,14 +3,19 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/hooks/useAuth";
+import { useBackendStatus } from "@/hooks/useBackendStatus";
 import { Role } from "@/types";
-import { Shield, Lock, Mail, ArrowRight, Sparkles, Play } from "lucide-react";
+import { Shield, Lock, Mail, ArrowRight, Sparkles, Play, Server } from "lucide-react";
 import Button from "@/components/ui/Button";
 import ThemeToggle from "@/components/ui/ThemeToggle";
 import OpeningAnimation from "@/components/intro/OpeningAnimation";
+import BackendStatusBadge from "@/components/backend/BackendStatusBadge";
+import BackendLoader from "@/components/backend/BackendLoader";
 
 export default function LoginPage() {
-  const { login, isLoading } = useAuth();
+  const { login, isLoading: isAuthLoading } = useAuth();
+  const { isReady, isSleeping, isChecking } = useBackendStatus();
+
   const [email, setEmail] = useState("admin@trishul.com");
   const [password, setPassword] = useState("password123");
   const [errorMsg, setErrorMsg] = useState("");
@@ -43,10 +48,17 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     if (!email.trim() || !password.trim()) {
       setErrorMsg("Please provide both email and password.");
       return;
     }
+
+    if (isSleeping || !isReady) {
+      setErrorMsg("Server is waking up from sleep mode. Please wait a few moments...");
+      return;
+    }
+
     setErrorMsg("");
     try {
       await login(email, password);
@@ -72,6 +84,11 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-950 text-slate-100 p-4 relative overflow-hidden select-none">
+      {/* Global Backend Cold-Start Loader Screen */}
+      <AnimatePresence>
+        {(isSleeping || (!isReady && isChecking)) && <BackendLoader fullScreen={true} />}
+      </AnimatePresence>
+
       {/* Dynamic Cinematic Opening Sequence Overlay */}
       <AnimatePresence>
         {showIntro && (
@@ -85,6 +102,8 @@ export default function LoginPage() {
 
       {/* Top Bar Controls */}
       <div className="absolute top-6 right-6 z-20 flex items-center gap-3">
+        <BackendStatusBadge />
+
         <button
           type="button"
           onClick={handleReplayIntro}
@@ -101,7 +120,7 @@ export default function LoginPage() {
       <motion.div
         initial={{ opacity: 0, y: 30, scale: 0.95 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }} // Spring physics curve for Phase 8
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         className="w-full max-w-md z-10"
       >
         <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-8 shadow-2xl backdrop-blur-xl">
@@ -187,11 +206,18 @@ export default function LoginPage() {
               type="submit"
               variant="primary"
               size="lg"
-              isLoading={isLoading}
+              isLoading={isAuthLoading || isChecking}
+              disabled={isSleeping || !isReady}
               className="w-full mt-2"
-              icon={<ArrowRight className="w-4 h-4" />}
+              icon={
+                isSleeping || !isReady ? (
+                  <Server className="w-4 h-4 text-amber-400 animate-pulse" />
+                ) : (
+                  <ArrowRight className="w-4 h-4" />
+                )
+              }
             >
-              Sign In to Dashboard
+              {isSleeping || !isReady ? "Server Waking Up..." : "Sign In to Dashboard"}
             </Button>
           </form>
 
