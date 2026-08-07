@@ -1,23 +1,38 @@
 const Lead = require('../models/Lead');
 const User = require('../models/User');
+const { SCOPE_ENUM } = require('../constants/workload');
 
-// @desc    Get leads based on User Role (RBAC) & Filters
+// @desc    Get leads based on User Role (RBAC) & Scope Filters
 // @route   GET /api/leads
 // @access  Private
 exports.list = async (req, res, next) => {
   try {
-    const { search, status } = req.query;
+    const { search, status, scope: rawScope } = req.query;
     const filter = {};
 
-    // Role-based record boundary filter
+    // Sanitize scope parameter safely against enum values
+    const validScopes = [SCOPE_ENUM.TEAM, SCOPE_ENUM.MINE, SCOPE_ENUM.ALL];
+    const scope = validScopes.includes(rawScope) ? rawScope : SCOPE_ENUM.TEAM;
+
+    // Hardened Zero-Trust Role-based Record Boundaries
     if (req.user.role === 'user') {
+      // Agents are STRICTLY forced to 'mine' regardless of query parameter
       filter.assignedTo = req.user.id;
     } else if (req.user.role === 'supervisor') {
-      const supervisees = await User.find({ supervisorId: req.user.id }).select('_id');
-      const superviseeIds = supervisees.map((s) => s._id);
-      filter.assignedTo = { $in: [req.user.id, ...superviseeIds] };
+      if (scope === SCOPE_ENUM.MINE) {
+        filter.assignedTo = req.user.id;
+      } else {
+        // Default 'team' scope for supervisor
+        const supervisees = await User.find({ supervisorId: req.user.id }).select('_id');
+        const superviseeIds = supervisees.map((s) => s._id);
+        filter.assignedTo = { $in: [req.user.id, ...superviseeIds] };
+      }
+    } else if (req.user.role === 'admin') {
+      if (scope === SCOPE_ENUM.MINE) {
+        filter.assignedTo = req.user.id;
+      }
+      // Otherwise Admin sees all leads (unconstrained)
     }
-    // Admin sees all leads (filter remains unconstrained by assignedTo)
 
     if (status && status !== 'all') {
       filter.status = status;

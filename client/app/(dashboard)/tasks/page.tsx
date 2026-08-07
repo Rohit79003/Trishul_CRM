@@ -24,8 +24,29 @@ import useAuth from "@/hooks/useAuth";
 
 export default function TasksPage() {
   const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
+  const isSupervisor = currentUser?.role === "supervisor";
+
   const { data: initialTasks, loading, error: fetchError, refetch } = useFetch<Task[]>("/tasks");
-  const { data: usersList } = useFetch<User[]>("/users");
+  const { data: allUsers } = useFetch<User[]>(isAdmin ? "/users" : null);
+  const { data: teamData } = useFetch<{ teamMembers: User[] }>(isSupervisor ? "/users/my-team" : null);
+
+  const availableAssignees = React.useMemo(() => {
+    if (isAdmin) {
+      return allUsers || [];
+    }
+    if (isSupervisor) {
+      const supervisees = teamData?.teamMembers || [];
+      const list = [...supervisees];
+      const curId = currentUser?.id || (currentUser as any)?._id;
+      if (currentUser && !list.some((m) => (m.id || (m as any)._id) === curId)) {
+        list.unshift(currentUser);
+      }
+      return list;
+    }
+    return currentUser ? [currentUser] : [];
+  }, [isAdmin, isSupervisor, allUsers, teamData, currentUser]);
+
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filterPriority, setFilterPriority] = useState<string>("all");
   const [filterAssignee, setFilterAssignee] = useState<string>("all");
@@ -294,14 +315,19 @@ export default function TasksPage() {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
               >
                 <option value="">Select an Assignee...</option>
-                <option value="Agent User">Agent User (agent@trishul.com)</option>
-                <option value="Supervisor User">Supervisor User (supervisor@trishul.com)</option>
-                <option value="Admin User">Admin User (admin@trishul.com)</option>
-                {usersList?.map((u) => (
-                  <option key={u.id || (u as any)._id} value={u.name || u.email}>
-                    {u.name} ({u.email} - {u.role})
-                  </option>
-                ))}
+                {availableAssignees.length > 0 ? (
+                  availableAssignees.map((u) => {
+                    const uId = u.id || (u as any)._id;
+                    const isSelf = uId === (currentUser?.id || (currentUser as any)?._id);
+                    return (
+                      <option key={uId} value={uId}>
+                        {u.name} {isSelf ? "(You)" : `(${u.department || u.role.toUpperCase()})`}
+                      </option>
+                    );
+                  })
+                ) : (
+                  <option value="" disabled>No team members assigned</option>
+                )}
               </select>
             </div>
 

@@ -23,13 +23,59 @@ import {
   Mail,
   Phone,
   User,
+  Users,
 } from "lucide-react";
 
 import useAuth from "@/hooks/useAuth";
+import { canFilterTeamScope } from "@/lib/permissions";
 
 export default function LeadsPage() {
   const { user: currentUser } = useAuth();
-  const { data: initialLeads, loading, error: fetchError, refetch } = useFetch<Lead[]>("/leads");
+
+  const [leadScope, setLeadScope] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const paramScope = urlParams.get("scope");
+      if (paramScope === "mine" || paramScope === "team") return paramScope;
+      const saved = localStorage.getItem("trishul_lead_scope");
+      if (saved === "mine" || saved === "team") return saved;
+    }
+    return "team";
+  });
+
+  const isAdmin = currentUser?.role === "admin";
+  const isSupervisor = currentUser?.role === "supervisor";
+
+  const { data: initialLeads, loading, error: fetchError, refetch } = useFetch<Lead[]>(
+    `/leads?scope=${leadScope}`
+  );
+  const { data: allUsers } = useFetch<User[]>(isAdmin ? "/users" : null);
+  const { data: teamData } = useFetch<{ teamMembers: User[] }>(isSupervisor ? "/users/my-team" : null);
+
+  const availableAssignees = React.useMemo(() => {
+    if (isAdmin) return allUsers || [];
+    if (isSupervisor) {
+      const supervisees = teamData?.teamMembers || [];
+      const list = [...supervisees];
+      const curId = currentUser?.id || (currentUser as any)?._id;
+      if (currentUser && !list.some((m) => (m.id || (m as any)._id) === curId)) {
+        list.unshift(currentUser);
+      }
+      return list;
+    }
+    return currentUser ? [currentUser] : [];
+  }, [isAdmin, isSupervisor, allUsers, teamData, currentUser]);
+
+  const handleScopeChange = (newScope: string) => {
+    setLeadScope(newScope);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("trishul_lead_scope", newScope);
+      const url = new URL(window.location.href);
+      url.searchParams.set("scope", newScope);
+      window.history.replaceState({}, "", url.toString());
+    }
+  };
+
   const [leads, setLeads] = useState<Lead[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -344,16 +390,47 @@ export default function LeadsPage() {
 
       {/* Filter Controls Bar */}
       <Card animateHover={false} className="p-4">
-        <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="relative w-full sm:w-80">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search leads, agent or source..."
-              className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-brand-amber"
-            />
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                placeholder="Search leads, agent or source..."
+                className="w-full pl-10 pr-4 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-xs sm:text-sm focus:outline-none focus:border-brand-amber"
+              />
+            </div>
+
+            {canFilterTeamScope(currentUser) && (
+              <div className="flex items-center p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl border border-slate-200 dark:border-slate-700/60 text-xs w-full sm:w-auto">
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange("team")}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 text-xs w-1/2 sm:w-auto ${
+                    leadScope === "team"
+                      ? "bg-white dark:bg-slate-900 text-brand-amber shadow-sm font-semibold border border-brand-amber/30"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <Users className="w-3.5 h-3.5" />
+                  <span>All My Team's Leads</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleScopeChange("mine")}
+                  className={`px-3 py-1.5 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 text-xs w-1/2 sm:w-auto ${
+                    leadScope === "mine"
+                      ? "bg-white dark:bg-slate-900 text-brand-amber shadow-sm font-semibold border border-brand-amber/30"
+                      : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-200"
+                  }`}
+                >
+                  <User className="w-3.5 h-3.5" />
+                  <span>Assigned to Me Only</span>
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
@@ -490,13 +567,22 @@ export default function LeadsPage() {
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                 Assigned Agent
               </label>
-              <input
-                type="text"
-                placeholder="Agent Name or ID"
+              <select
                 value={formData.assignedTo}
                 onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
-              />
+              >
+                <option value="">Select Lead Assignee...</option>
+                {availableAssignees.map((u) => {
+                  const uId = u.id || (u as any)._id;
+                  const isSelf = uId === (currentUser?.id || (currentUser as any)?._id);
+                  return (
+                    <option key={uId} value={uId}>
+                      {u.name} {isSelf ? "(You)" : `(${u.department || u.role.toUpperCase()})`}
+                    </option>
+                  );
+                })}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">

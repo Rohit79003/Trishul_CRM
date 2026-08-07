@@ -34,7 +34,7 @@ const MENU_ITEMS: MenuItem[] = [
   { name: "Customers", href: "/customers", icon: Users, roles: ["admin", "supervisor", "user"] },
   { name: "Leads Pipeline", href: "/leads", icon: Target, roles: ["admin", "supervisor", "user"] },
   { name: "Tasks", href: "/tasks", icon: CheckSquare, roles: ["admin", "supervisor", "user"] },
-  { name: "Employees", href: "/employees", icon: UserCog, roles: ["admin"] },
+  { name: "Employees", href: "/employees", icon: UserCog, roles: ["admin", "supervisor"] },
   { name: "Reports", href: "/reports", icon: BarChart3, roles: ["admin", "supervisor"] },
   { name: "AI Assistant", href: "/ai-assistant", icon: Bot, roles: ["admin"] },
   { name: "Settings", href: "/settings", icon: Settings, roles: ["admin"] },
@@ -89,6 +89,7 @@ export const Sidebar: React.FC = () => {
         {MENU_ITEMS.filter((item) => item.roles.includes(currentRole)).map((item) => {
           const isActive = pathname === item.href || pathname?.startsWith(`${item.href}/`);
           const Icon = item.icon;
+          const displayLabel = item.href === "/employees" ? (currentRole === "supervisor" ? "My Team" : "Employees") : item.name;
 
           return (
             <Link
@@ -103,16 +104,20 @@ export const Sidebar: React.FC = () => {
               {/* Active Tab Pill Indicator with layoutId */}
               {isActive && (
                 <motion.div
-                  layoutId="activeTab"
-                  className="absolute inset-0 bg-gradient-to-r from-brand-amber to-amber-500 rounded-xl shadow-md shadow-brand-amber/20"
-                  transition={{ type: "spring", stiffness: 400, damping: 35 }}
+                  layoutId="activeSidebarIndicator"
+                  className="absolute inset-0 bg-brand-amber rounded-xl"
+                  transition={{ type: "spring", stiffness: 500, damping: 35 }}
                 />
               )}
-              <span className="relative z-10 shrink-0">
-                <Icon className="w-5 h-5" />
-              </span>
+
+              <Icon
+                className={`w-5 h-5 shrink-0 z-10 ${
+                  isActive ? "text-slate-950 font-extrabold" : "text-slate-400 group-hover:text-white"
+                }`}
+              />
+
               {!collapsed && (
-                <span className="relative z-10 truncate">{item.name}</span>
+                <span className="z-10 truncate font-semibold tracking-wide">{displayLabel}</span>
               )}
             </Link>
           );
