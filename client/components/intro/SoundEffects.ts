@@ -301,7 +301,16 @@ class SoundEffectsController {
       });
     } catch (e) {}
   }
+  // Cleanup / Graceful Stop on Skip or Unmount
+  public stopAll() {
+    if (this.ctx && this.ctx.state === "running") {
+      try {
+        this.ctx.suspend();
+      } catch (e) {}
+    }
+  }
 }
 
 export const soundFX = new SoundEffectsController();
 export default soundFX;
+
