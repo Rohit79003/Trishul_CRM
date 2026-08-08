@@ -19,6 +19,7 @@ import {
   Circle,
   Filter,
   Trash2,
+  Edit2,
 } from "lucide-react";
 import useAuth from "@/hooks/useAuth";
 
@@ -49,7 +50,6 @@ export default function TasksPage() {
 
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filterPriority, setFilterPriority] = useState<string>("all");
-  const [filterAssignee, setFilterAssignee] = useState<string>("all");
   const [actionError, setActionError] = useState<string>("");
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -62,6 +62,7 @@ export default function TasksPage() {
     dueDate: new Date().toISOString().split("T")[0],
     priority: "medium" as Task["priority"],
     category: "Sales",
+    status: "pending" as "pending" | "in-progress" | "completed",
   });
 
   React.useEffect(() => {
@@ -71,12 +72,36 @@ export default function TasksPage() {
   const toggleTaskComplete = async (id: string) => {
     const target = tasks.find((t) => (t.id || (t as any)._id) === id);
     if (!target) return;
-    const newStatus = !target.completed;
+    const newCompleted = !target.completed;
+    const newStatus = newCompleted ? "completed" : "pending";
     setTasks((prev) =>
-      prev.map((t) => ((t.id || (t as any)._id) === id ? { ...t, completed: newStatus } : t))
+      prev.map((t) =>
+        (t.id || (t as any)._id) === id
+          ? { ...t, completed: newCompleted, status: newStatus }
+          : t
+      )
     );
     try {
-      await api.put(`/tasks/${id}`, { completed: newStatus });
+      await api.put(`/tasks/${id}`, { completed: newCompleted, status: newStatus });
+    } catch (err) {
+      refetch();
+    }
+  };
+
+  const handleQuickStatusChange = async (
+    taskId: string,
+    newStatus: "pending" | "in-progress" | "completed"
+  ) => {
+    const isComp = newStatus === "completed";
+    setTasks((prev) =>
+      prev.map((t) =>
+        (t.id || (t as any)._id) === taskId
+          ? { ...t, status: newStatus, completed: isComp }
+          : t
+      )
+    );
+    try {
+      await api.put(`/tasks/${taskId}`, { status: newStatus });
     } catch (err) {
       refetch();
     }
@@ -87,10 +112,32 @@ export default function TasksPage() {
     setEditingTask(null);
     setFormData({
       title: "",
-      assignedTo: "",
+      assignedTo: currentUser?.id || (currentUser as any)?._id || "",
       dueDate: new Date().toISOString().split("T")[0],
       priority: "medium",
       category: "Sales",
+      status: "pending",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (task: Task) => {
+    setActionError("");
+    setEditingTask(task);
+    const assignedId =
+      typeof task.assignedTo === "object" && task.assignedTo !== null
+        ? (task.assignedTo as any)._id || (task.assignedTo as any).id || ""
+        : task.assignedTo || "";
+
+    const taskStatus = task.status || (task.completed ? "completed" : "pending");
+
+    setFormData({
+      title: task.title,
+      assignedTo: assignedId,
+      dueDate: task.dueDate ? String(task.dueDate).split("T")[0] : new Date().toISOString().split("T")[0],
+      priority: task.priority || "medium",
+      category: task.category || "Sales",
+      status: taskStatus,
     });
     setIsModalOpen(true);
   };
@@ -201,6 +248,8 @@ export default function TasksPage() {
             ) : (
               filteredTasks.map((t) => {
                 const taskId = t.id || (t as any)._id;
+                const currentStatus = t.status || (t.completed ? "completed" : "pending");
+
                 return (
                   <motion.div
                     key={taskId}
@@ -244,10 +293,14 @@ export default function TasksPage() {
                             </h4>
                             <div className="flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                               <span className="flex items-center gap-1">
-                                <UserIcon className="w-3 h-3 text-brand-amber" /> {typeof t.assignedTo === "object" && t.assignedTo !== null ? ((t.assignedTo as any).name || (t.assignedTo as any).email || "Unassigned") : (t.assignedTo || "Unassigned")}
+                                <UserIcon className="w-3 h-3 text-brand-amber" />{" "}
+                                {typeof t.assignedTo === "object" && t.assignedTo !== null
+                                  ? (t.assignedTo as any).name || (t.assignedTo as any).email || "Unassigned"
+                                  : t.assignedTo || "Unassigned"}
                               </span>
                               <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-sky-400" /> Due: {t.dueDate ? String(t.dueDate).split("T")[0] : "No date"}
+                                <Calendar className="w-3 h-3 text-sky-400" /> Due:{" "}
+                                {t.dueDate ? String(t.dueDate).split("T")[0] : "No date"}
                               </span>
                             </div>
                           </div>
@@ -255,15 +308,38 @@ export default function TasksPage() {
 
                         {/* Right Badges & Controls */}
                         <div className="flex items-center gap-3 shrink-0">
+                          {/* Quick Status Dropdown (Accessible to all roles) */}
+                          <select
+                            value={currentStatus}
+                            onChange={(e) =>
+                              handleQuickStatusChange(taskId, e.target.value as any)
+                            }
+                            className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:border-brand-amber focus:outline-none cursor-pointer capitalize"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="in-progress">In-Progress</option>
+                            <option value="completed">Completed</option>
+                          </select>
+
                           <Badge variant={t.priority} />
+
                           {currentUser?.role !== "user" && (
-                            <button
-                              onClick={() => deleteTask(taskId)}
-                              className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
-                              title="Delete Task"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                            <>
+                              <button
+                                onClick={() => handleOpenEdit(t)}
+                                className="p-1.5 text-slate-400 hover:text-brand-amber hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
+                                title="Edit Task"
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => deleteTask(taskId)}
+                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-lg transition-colors"
+                                title="Delete Task"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
@@ -276,11 +352,11 @@ export default function TasksPage() {
         </div>
       </DataState>
 
-      {/* Modal Add Task */}
+      {/* Modal Add / Edit Task */}
       <Modal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        title="Assign New Task"
+        title={editingTask ? "Edit Task Record" : "Assign New Task"}
         maxWidth="md"
       >
         <form onSubmit={handleSave} className="space-y-4">
@@ -326,7 +402,9 @@ export default function TasksPage() {
                     );
                   })
                 ) : (
-                  <option value="" disabled>No team members assigned</option>
+                  <option value="" disabled>
+                    No team members available
+                  </option>
                 )}
               </select>
             </div>
@@ -349,17 +427,36 @@ export default function TasksPage() {
             </div>
           </div>
 
-          <div>
-            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-              Due Date *
-            </label>
-            <input
-              type="date"
-              required
-              value={formData.dueDate}
-              onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Task Status
+              </label>
+              <select
+                value={formData.status}
+                onChange={(e) =>
+                  setFormData({ ...formData, status: e.target.value as any })
+                }
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none capitalize"
+              >
+                <option value="pending">Pending</option>
+                <option value="in-progress">In-Progress</option>
+                <option value="completed">Completed</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                Due Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={formData.dueDate}
+                onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
+                className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
+              />
+            </div>
           </div>
 
           <div className="flex justify-end gap-3 pt-2">
@@ -367,7 +464,7 @@ export default function TasksPage() {
               Cancel
             </Button>
             <Button type="submit" variant="primary" isLoading={isSubmitting}>
-              Assign Task
+              {editingTask ? "Update Task" : "Assign Task"}
             </Button>
           </div>
         </form>

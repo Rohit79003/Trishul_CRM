@@ -67,8 +67,10 @@ exports.create = async (req, res, next) => {
       return res.status(403).json({ message: 'Agents are not authorized to create or assign tasks.' });
     }
 
-    const { title, assignedTo, dueDate, priority, category } = req.body;
+    const { title, assignedTo, dueDate, priority, category, status } = req.body;
     const assigneeId = await resolveAssigneeId(assignedTo, req.user.id);
+    const initialStatus = status || 'pending';
+    const isCompleted = initialStatus === 'completed';
 
     const task = await Task.create({
       title,
@@ -76,11 +78,12 @@ exports.create = async (req, res, next) => {
       dueDate: dueDate || new Date(),
       priority: priority || 'medium',
       category: category || 'Sales',
-      completed: false,
+      status: initialStatus,
+      completed: isCompleted,
       createdBy: req.user.id,
     });
 
-    const populated = await Task.findById(task._id).populate('assignedTo', 'name email');
+    const populated = await Task.findById(task._id).populate('assignedTo', 'name email role');
     res.status(201).json(populated);
   } catch (error) {
     next(error);
@@ -97,19 +100,39 @@ exports.update = async (req, res, next) => {
       return res.status(404).json({ message: 'Task not found.' });
     }
 
-    const updateFields = { ...req.body };
+    let updateFields = { ...req.body };
+
     if (req.user.role === 'user') {
-      // Agents can only update task completion status, not reassignment
-      delete updateFields.assignedTo;
-      delete updateFields.createdBy;
-    } else if (updateFields.assignedTo) {
-      updateFields.assignedTo = await resolveAssigneeId(updateFields.assignedTo, task.assignedTo);
+      // Agents can only update status (pending, in-progress, completed) or completion toggle on their assigned tasks
+      if (task.assignedTo.toString() !== req.user.id) {
+        return res.status(403).json({ message: 'Forbidden. You can only update status for your assigned tasks.' });
+      }
+
+      const allowed = {};
+      if (req.body.status !== undefined) {
+        allowed.status = req.body.status;
+        allowed.completed = req.body.status === 'completed';
+      } else if (req.body.completed !== undefined) {
+        allowed.completed = Boolean(req.body.completed);
+        allowed.status = req.body.completed ? 'completed' : 'pending';
+      }
+      updateFields = allowed;
+    } else {
+      // Admin and Supervisor have full access to edit all fields
+      if (updateFields.assignedTo) {
+        updateFields.assignedTo = await resolveAssigneeId(updateFields.assignedTo, task.assignedTo);
+      }
+      if (updateFields.status !== undefined) {
+        updateFields.completed = updateFields.status === 'completed';
+      } else if (updateFields.completed !== undefined) {
+        updateFields.status = updateFields.completed ? 'completed' : (task.status === 'completed' ? 'pending' : (task.status || 'pending'));
+      }
     }
 
     task = await Task.findByIdAndUpdate(req.params.id, updateFields, {
       new: true,
       runValidators: true,
-    }).populate('assignedTo', 'name email');
+    }).populate('assignedTo', 'name email role');
 
     res.json(task);
   } catch (error) {

@@ -23,13 +23,35 @@ import {
   Phone,
   Mail,
   Building,
+  User as UserIcon,
 } from "lucide-react";
 
 import useAuth from "@/hooks/useAuth";
+import { User } from "@/types";
 
 export default function CustomersPage() {
   const { user: currentUser } = useAuth();
+  const isAdmin = currentUser?.role === "admin";
+  const isSupervisor = currentUser?.role === "supervisor";
+
   const { data: initialCustomers, loading, error: fetchError, refetch } = useFetch<Customer[]>("/customers");
+  const { data: allUsers } = useFetch<User[]>(isAdmin ? "/users" : null);
+  const { data: teamData } = useFetch<{ teamMembers: User[] }>(isSupervisor ? "/users/my-team" : null);
+
+  const availableAssignees = React.useMemo(() => {
+    if (isAdmin) return allUsers || [];
+    if (isSupervisor) {
+      const supervisees = teamData?.teamMembers || [];
+      const list = [...supervisees];
+      const curId = currentUser?.id || (currentUser as any)?._id;
+      if (currentUser && !list.some((m) => (m.id || (m as any)._id) === curId)) {
+        list.unshift(currentUser);
+      }
+      return list;
+    }
+    return currentUser ? [currentUser] : [];
+  }, [isAdmin, isSupervisor, allUsers, teamData, currentUser]);
+
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -52,6 +74,7 @@ export default function CustomersPage() {
     status: "active" as "new" | "active" | "inactive",
     value: 500000,
     notes: "",
+    assignedTo: "",
   });
 
   // Sync initial customers from live API
@@ -83,6 +106,7 @@ export default function CustomersPage() {
       status: "active",
       value: 500000,
       notes: "",
+      assignedTo: currentUser?.id || (currentUser as any)?._id || "",
     });
     setIsAddEditOpen(true);
   };
@@ -90,6 +114,11 @@ export default function CustomersPage() {
   const handleOpenEdit = (customer: Customer) => {
     setActionError("");
     setEditingCustomer(customer);
+    const assignedId =
+      typeof customer.assignedTo === "object" && customer.assignedTo !== null
+        ? (customer.assignedTo as any)._id || (customer.assignedTo as any).id || ""
+        : customer.assignedTo || "";
+
     setFormData({
       name: customer.name,
       company: customer.company,
@@ -99,6 +128,7 @@ export default function CustomersPage() {
       status: customer.status,
       value: customer.value || 500000,
       notes: customer.notes || "",
+      assignedTo: assignedId,
     });
     setIsAddEditOpen(true);
   };
@@ -145,15 +175,22 @@ export default function CustomersPage() {
   };
 
   const handleExportPDF = () => {
-    const headers = ["Name", "Company", "Email", "Phone", "Status", "Contract Value"];
-    const rows = filteredCustomers.map((c) => [
-      c.name,
-      c.company,
-      c.email,
-      c.phone,
-      c.status.toUpperCase(),
-      `₹${(c.value || 0).toLocaleString("en-IN")}`,
-    ]);
+    const headers = ["Name", "Company", "Email", "Phone", "Assigned To", "Status", "Contract Value"];
+    const rows = filteredCustomers.map((c) => {
+      const assigneeName =
+        typeof c.assignedTo === "object" && c.assignedTo !== null
+          ? (c.assignedTo as any).name || (c.assignedTo as any).email || "Unassigned"
+          : "Unassigned";
+      return [
+        c.name,
+        c.company,
+        c.email,
+        c.phone,
+        assigneeName,
+        c.status.toUpperCase(),
+        `₹${(c.value || 0).toLocaleString("en-IN")}`,
+      ];
+    });
     exportToPDF({
       title: "Trishul CRM - Customer Directory",
       filename: `Customers_Report_${Date.now()}`,
@@ -163,18 +200,25 @@ export default function CustomersPage() {
   };
 
   const handleExportExcel = () => {
-    const headers = ["ID", "Name", "Company", "Email", "Phone", "Address", "Status", "Contract Value", "Created Date"];
-    const rows = filteredCustomers.map((c) => [
-      c.id || (c as any)._id,
-      c.name,
-      c.company,
-      c.email,
-      c.phone,
-      c.address,
-      c.status,
-      c.value || 0,
-      c.createdAt,
-    ]);
+    const headers = ["ID", "Name", "Company", "Email", "Phone", "Assigned To", "Address", "Status", "Contract Value", "Created Date"];
+    const rows = filteredCustomers.map((c) => {
+      const assigneeName =
+        typeof c.assignedTo === "object" && c.assignedTo !== null
+          ? (c.assignedTo as any).name || (c.assignedTo as any).email || "Unassigned"
+          : "Unassigned";
+      return [
+        c.id || (c as any)._id,
+        c.name,
+        c.company,
+        c.email,
+        c.phone,
+        assigneeName,
+        c.address,
+        c.status,
+        c.value || 0,
+        c.createdAt,
+      ];
+    });
     exportToExcel({
       filename: `Customers_Data_${Date.now()}`,
       sheetName: "Customers",
@@ -208,6 +252,21 @@ export default function CustomersPage() {
           </div>
         </div>
       ),
+    },
+    {
+      header: "Assigned To",
+      cell: (row) => {
+        const assignee =
+          typeof row.assignedTo === "object" && row.assignedTo !== null
+            ? (row.assignedTo as any)
+            : null;
+        return (
+          <div className="flex items-center gap-1.5 text-xs text-slate-700 dark:text-slate-300">
+            <UserIcon className="w-3.5 h-3.5 text-brand-amber" />
+            <span className="font-medium">{assignee ? assignee.name || assignee.email : "Unassigned"}</span>
+          </div>
+        );
+      },
     },
     {
       header: "Status",
@@ -444,6 +503,29 @@ export default function CustomersPage() {
                 className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
               />
             </div>
+            {currentUser?.role !== "user" && (
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Assigned Representative *
+                </label>
+                <select
+                  required
+                  value={formData.assignedTo}
+                  onChange={(e) => setFormData({ ...formData, assignedTo: e.target.value })}
+                  className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-sm focus:border-brand-amber focus:outline-none"
+                >
+                  <option value="">-- Select Assignee --</option>
+                  {availableAssignees.map((u) => {
+                    const uId = u.id || (u as any)._id;
+                    return (
+                      <option key={uId} value={uId}>
+                        {u.name} ({u.role.toUpperCase()})
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
           </div>
 
           <div>

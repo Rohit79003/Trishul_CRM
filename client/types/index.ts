@@ -22,6 +22,8 @@ export interface Customer {
   notes?: string;
   createdAt: string;
   value?: number;
+  assignedTo?: string | User | { _id?: string; id?: string; name: string; email: string };
+  createdBy?: string | User | { _id?: string; id?: string; name: string; email: string };
 }
 
 export interface Lead {
@@ -40,10 +42,11 @@ export interface Lead {
 export interface Task {
   id: string;
   title: string;
-  assignedTo: string;
+  assignedTo: string | User | { _id?: string; id?: string; name: string; email: string };
   dueDate: string;
   priority: 'low' | 'medium' | 'high';
   completed: boolean;
+  status?: 'pending' | 'in-progress' | 'completed';
   category?: string;
 }
 

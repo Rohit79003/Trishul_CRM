@@ -43,10 +43,13 @@ export const Badge: React.FC<BadgeProps> = ({
     won: "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border-emerald-500/40 font-semibold",
     lost: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30",
 
-    // Priority
+    // Priority & Task statuses
     high: "bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30 font-semibold",
     medium: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
     low: "bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30",
+    pending: "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30",
+    "in-progress": "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30 font-medium",
+    completed: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-semibold",
 
     // Roles
     admin: "bg-amber-500/20 text-amber-700 dark:text-brand-amber border-amber-500/40 font-semibold",
