@@ -58,9 +58,15 @@ export default function DashboardPage() {
 
         <div className="flex items-center gap-3 relative z-10">
           <Link href="/leads">
-            <Button variant="primary" size="sm" icon={<Plus className="w-4 h-4" />}>
-              Add Lead
-            </Button>
+            {user?.role === "user" ? (
+              <Button variant="primary" size="sm" icon={<Target className="w-4 h-4" />}>
+                Leads
+              </Button>
+            ) : (
+              <Button variant="primary" size="sm" icon={<Plus className="w-4 h-4" />}>
+                Add Lead
+              </Button>
+            )}
           </Link>
           <Link href="/tasks">
             <Button variant="secondary" size="sm" icon={<CheckSquare className="w-4 h-4" />}>
